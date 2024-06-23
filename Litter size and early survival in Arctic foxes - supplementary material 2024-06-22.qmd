@@ -115,7 +115,9 @@ Predictions are calculated for each mother age from 1 to 8 keeping the rodent in
                  type = 'fixed',
                  condition = c(rodent_index = 4))) 
                    # median value for rodent_index = 4
+```
 
+```{r}
 ## Plot of predictions with observations
 pw |> ggplot(aes(x = x, y = predicted)) +
   geom_errorbar(width = 0.2, 
