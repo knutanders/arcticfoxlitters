@@ -107,17 +107,14 @@ plotQQunif(w1)
 ```
 *Figure S1. Scaled residual QQ plot for the model of litter size in wild populations. The figure also includes statistics used to examine model assumptions.* 
 
-Predictions are calculated for each mother age from 1 to 8 keeping the rodent index equal to median value of the variable. Random effects are ignored by using the argument type = 'fixed'.
+Predictions are calculated for each mother age from 1 to 8 keeping the rodent index equal to median value of the variable (rodent_index = 4). Random effects are ignored by using the argument type = 'fixed'.
 
 ```{r}
 #| warning: false
 (pw <- ggpredict(w1, terms="mother_age [all]",
                  type = 'fixed',
                  condition = c(rodent_index = 4))) 
-                   # median value for rodent_index = 4
-```
 
-```{r}
 ## Plot of predictions with observations
 pw |> ggplot(aes(x = x, y = predicted)) +
   geom_errorbar(width = 0.2, 
