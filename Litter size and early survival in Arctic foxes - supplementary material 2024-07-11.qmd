@@ -9,16 +9,19 @@ format:
 editor: visual
 ---
 
-
 # Introduction
 
 This document describes the analysis of variation in Arctic fox litter size, breeding probability and early survival of pups.
 
-The main objective is to examine the relationship between litter size and mother's age. We compare data on litter size in wild populations with data from foxes kept in captivity as part of a conservation program. For foxes in captivity, data on pup survival until 8-10 weeks of age. Based on these data the relationship between pup survival and mother's age is examined.
+The main objective is to examine the relationship between litter size and mother's age.
+<!-- why single out littersize? -->
+We compare data on litter size in wild populations with data from foxes kept in captivity as part of a conservation program. For foxes in captivity, data on pup survival until 8-10 weeks of age. Based on these data the relationship between pup survival and mother's age is examined.
+<!-- should we focus on comparing wild and captive? - see review comments -->
 
 The most important prey for Arctic foxes in the wild is lemmings and other species of small rodents. The cyclic variation in abundance of small rodents create large variations in availability of prey between years. In contrast, foxes in the captive breeding station are fed every day and thus experience no variation in food resources between years.
 
 This document is part of the supplementary materials for the manuscript "**Reproductive senescence in cyclic environments: effects of maternal age on reproductive performance in the Arctic fox**".
+<!-- dette bør kanskje komme i heading -->
 
 To run the R code in this document, it is necessary to first download these three datasets:
 
@@ -36,7 +39,11 @@ To run the R code in this document, it is necessary to first download these thre
 
 For the *wild populations*, data on litter size were only recorded for breeding events that actually produced pups and where the pups were observed after emerging from the den. The data does not include information about unsuccessful breeding events or foxes that did not breed at all.
 
-For *captive foxes,* litter size data include zeros. For comparison with *wild foxes*, we have fitted a zero-truncated model also for these data. This implies that we model the variation in litter size conditional on producing at least one pup that survived until marking.
+For *captive foxes,* litter size data include zeros. For comparison with *wild foxes*, we have fitted a zero-truncated model 
+<!-- also for these data.  -->
+for both data sets.
+<!--  NB! text replacement above -->
+This implies that we model the variation in litter size conditional on producing at least one pup that survived until marking.
 
 In both datasets, there are repeated observations for some of the females (litter size for the same female in different years). To account for this dependence, we include the random effect 'mother ID'. In the datasets, each mother has a single litter per year.
 
@@ -142,7 +149,7 @@ pw |> ggplot(aes(x = x, y = predicted)) +
         panel.grid.minor.y = element_blank())
 ```
 
-*Figure S2. Predicted litter size as a function of female age in wild Arctic foxes.The predicted values are displayed as blue dots and observations as smaller, grey dots. Whiskers indicate 95% confidence intervals.*
+*Figure S2. Predicted and observed litter size as a function of female age in wild Arctic foxes.The predicted values are displayed as blue dots and observations as smaller, grey dots. Whiskers indicate 95% confidence intervals.*
 
 <br/><br/>
 
@@ -175,7 +182,7 @@ ggpredict(w1,
 
 ### Litter size in captivity
 
-To make the data on litter size in captivity and wild populations comparable, breeding attempts that did not produce pups are removed prior to analysis.
+To make the data on litter size in captivity and wild populations comparable, breeding attempts that did not produce pups are removed prior to analysis, and we fit a zero-truncated model to both data sets.
 
 ```{r}
 ## Removing zeros for truncated models
@@ -203,6 +210,7 @@ c2 <- glmmTMB(litter_size ~ poly(mother_age, 2) +
 ```
 
 AIC value for the model c2 including rodent_index as a predictor is `r sprintf("%.2f", AIC(c2))`
+<!-- Her er jeg litt forvirra, for AIC ER jo (LITT) lavere når rodent index er med... Både over og under sies det at AIC blir høyere med rodent_index.  -->
 
 The potential relationship between litter size and rodent index can be examined by plotting predicted values for litter size against rodent index:
 
@@ -232,10 +240,11 @@ ggpredict(c2,
 
 *Figure S4. Relationship between rodent index and predicted litter size in captive Arctic foxes. The effect of rodent index on litter size is described by a B-spline function.*
 
-The plot does not display any clear relationship between variation in the rodent index and litter size in captivity. Furthermore, including the rodent index as a predictor in the model does not improve the likelihood of the model as assessed by the AIC values. We therefore exclude rodent index from the final model for litter size in captivity.
+The plot does not display any clear relationship between variation in the rodent index and litter size in captivity. Furthermore, including the rodent index as a predictor in the model does not improve the likelihood of the model as assessed by the AIC values. 
+<!-- Dette stemmer jo ikke... Liten forskjell, men modellen med 'rodent index' har lavest AIC -->
+We therefore exclude rodent index from the final model for litter size in captivity.
 
-<br/><br/>
-Predictions for foxes in captivity based on model c1:
+<br/><br/> Predictions for foxes in captivity based on model c1:
 
 ```{r}
 pc <- ggpredict(c1, terms="mother_age [all]", type = 'fixed')
@@ -300,29 +309,61 @@ predictions |> ggplot(aes(x = x, y = predicted, group = origin, color = origin, 
 
 The data from foxes in captivity include both females breeding and not breeding. This data is not available for wild foxes. For captive foxes we can therefore model the probability of producing a litter. The binary outcome 'breeding' or 'no breeding' of individual foxes in each year is used as the response variable and analysed using a GLMM with a binomial distribution. The model include the fixed effect 'age of the mother' using a second order polynomial function. The 'mother ID' and 'year' were included as random effects to account for correlation in the data.
 
+
+<!-- Nei, slik kan du ikke skrive det. Når du formulerer en modell hierakisk må du begynne med observasjonene (Y), og du kan heller ikke ha med definisjoner av variabler i modell-formuleringen. Dette retta jeg opp sist - så her har det skjedd en glipp. Jeg har kommentert ut orginalen her og limt inn teksten fra min tidligere versjon under -->
+
+<!-- The structural form of the model for probability of breeding: -->
+
+<!-- $$ \begin{aligned} -->
+<!-- b_{ij} & = Prob(Y_{ij} = 1|X_{ij}) \\ -->
+<!-- logit(b_{ij}) & = \beta_0 + \beta_1 X_{ij} + \beta_2 X_{ij}^2 + \delta_i + \gamma_j \\ -->
+<!-- Y_{ij} & \sim Bern(b_{ij}) \\ -->
+<!-- \delta_i & \sim N(0, \sigma_\delta) \\ -->
+<!-- \epsilon_j & \sim N(0, \sigma_\epsilon) \\ -->
+<!-- \end{aligned} -->
+<!-- $$ -->
+
+<!-- where $b_{ij}$ is the probability of breeding for mother $i$ in year $j$. $\delta_i$ is the random effect of mother $i$ and $\gamma_j$ the random effect of year $j$. -->
+
+<!-- To examine the potential effect of rodents on probability of breeding in captivity, we fitted a second model including that also include 'rodent index' as a fixed effect using a B-spline function to account for non-linear responses: -->
+
+<!-- $$ \begin{aligned} -->
+<!-- b_{ij} & = Prob(Y_{ij} = 1|X_{ij}) \\ -->
+<!-- logit(b_{ij}) & = \beta_0 + \beta_1 X_{ij} + \beta_2 X_{ij}^2 + s(R_{j}) -->
+<!-- + \delta_i + \gamma_j \\ -->
+<!-- Y_{ij} & \sim Bern(b_{ij}) \\ -->
+<!-- \delta_i & \sim N(0, \sigma_\delta) \\ -->
+<!-- \epsilon_j & \sim N(0, \sigma_\epsilon) \\ -->
+<!-- \end{aligned} -->
+<!-- $$ -->
+
+<!-- $s()$ is a B-spline function that allows for a smooth, non-linear relationship between $\text{logit}(b_{ij})$ and the rodent index $R$ in year $j$. -->
+
 The structural form of the model for probability of breeding:
 
-$$ \begin{aligned}
-b_{ij} & = Prob(Y_{ij} = 1|X_{ij}) \\
-logit(b_{ij}) & = \beta_0 + \beta_1 X_{ij} + \beta_2 X_{ij}^2 + \delta_i + \gamma_j \\
-Y_{ij} & \sim Bern(b_{ij}) \\
-\delta_i & \sim N(0, \sigma_\delta) \\
-\epsilon_j & \sim N(0, \sigma_\epsilon) \\
-\end{aligned}
 $$
-
-where $b_{ij}$ is the probability of breeding for mother $i$ in year $j$. $\delta_i$ is the random effect of mother $i$ and $\gamma_j$ the random effect of year $j$.
-
-To examine the potential effect of rodents on probability of breeding in captivity, we fitted a second model including that also include 'rodent index' as a fixed effect using a B-spline function to account for non-linear responses:
-
-$$ \begin{aligned}
-b_{ij} & = Prob(Y_{ij} = 1|X_{ij}) \\
-logit(b_{ij}) & = \beta_0 + \beta_1 X_{ij} + \beta_2 X_{ij}^2 + s(R_{j})
+\begin{align}
+Y_{ij} & \sim \text{Bernoulli}(b_{ij}) \\
+\text{logit}(b_{ij}) & = \beta_0 + X_{ij}\beta_1 +X_{ij}^2\beta_2
 + \delta_i + \gamma_j \\
-Y_{ij} & \sim Bern(b_{ij}) \\
 \delta_i & \sim N(0, \sigma_\delta) \\
 \epsilon_j & \sim N(0, \sigma_\epsilon) \\
-\end{aligned}
+\end{align}
+$$
+where $b_{ij}$ is the probability of breeding for mother $i$ in year $j$.
+
+$\delta_i$ is the random effect of mother $i$ and $\gamma_j$ the random effect of year $j$.
+
+To examine the potential effect of rodents on probability of breeding in captivity, we fitted a second model including rodent index as a predictor:
+
+$$
+\begin{align}
+Y_{ij} & \sim \text{Bernoulli}(b_{ij}) \\
+\text{logit}(b_{ij}) & = \beta_0 + X_{ij}\beta_1 +X_{ij}^2\beta_2 + s(R_{j})
++ \delta_i + \gamma_j \\
+\delta_i & \sim N(0, \sigma_\delta) \\
+\epsilon_j & \sim N(0, \sigma_\epsilon) \\
+\end{align}
 $$
 
 $s()$ is a B-spline function that allows for a smooth, non-linear relationship between $\text{logit}(b_{ij})$ and the rodent index $R$ in year $j$.
@@ -393,7 +434,8 @@ The dataset includes information on survival of individual Arctic fox pups in th
 
 The structural form of the binomial model for pup survival:
 
-$$ \begin{aligned}
+$$
+\begin{aligned}
 Y_{ij} & \sim \text{Bernoulli}(b_{ij}) \\
 \text{logit}(b_{ij}) & = \beta_0 + X_{ij}\beta_1 +X_{ij}^2\beta_2 + s(R_{j})
 + \delta_i + \gamma_j \\
@@ -436,8 +478,6 @@ Survival of pups in captivity is predicted using the ggpredict function from the
 (pred_s1 <- ggpredict(s1, terms="mother_age [all]"))
 ```
 
-
-
 ```{r}
 pred_s1 |> tibble() |>
   ggplot(aes(x=x, y= predicted)) + 
@@ -457,3 +497,12 @@ pred_s1 |> tibble() |>
 ```
 
 *Figure S7. Probability of survival in captive Arctic fox pups from birth until 8-10 weeks of age plotted against age of mother.*
+
+# Expcted number of surviving pups in captivity
+
+The expected number of surviving offspring in captivity ($\Lambda_a$), depending on mother age ($a$), can be computed from multiplying the predicted breeding probability ($B_a$), litter size ($L_a$), and offspring survival ($S_a$) for each mother age.
+
+$$
+$$
+
+
