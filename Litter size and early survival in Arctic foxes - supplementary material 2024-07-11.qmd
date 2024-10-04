@@ -80,7 +80,7 @@ Loading the required packages:
 ```
 
 \
-Reading in the three datasets:
+Reading in the three data sets:
 
 ```{r}
 #| warning: false
@@ -498,11 +498,93 @@ pred_s1 |> tibble() |>
 
 *Figure S7. Probability of survival in captive Arctic fox pups from birth until 8-10 weeks of age plotted against age of mother.*
 
-# Expcted number of surviving pups in captivity
+# Expected number of surviving pups in captivity
 
-The expected number of surviving offspring in captivity ($\Lambda_a$), depending on mother age ($a$), can be computed from multiplying the predicted breeding probability ($B_a$), litter size ($L_a$), and offspring survival ($S_a$) for each mother age.
+The expected number of surviving offspring in captivity ($\widehat \Lambda_a$), depending on mother age ($a$), can be computed by multiplying the predicted breeding probability ($\widehat B_a$), litter size ($\widehat L_a$), and offspring survival ($S_a$) for each mother age.
 
 $$
+\widehat \Lambda_a = \widehat B_a \widehat L_a \widehat S_a
 $$
 
+To compute an approximate 95% confidence interval, we first compute the approximate sampling variance and confidence interval on the log-scale, and then back transform the confidence interval to the arithmetic scale.
 
+Since $\log(\widehat \Lambda_a) = \log(\widehat B_a) + \log(\widehat L_a) + \log(\widehat S_a)$ and and the three components are estimated independently, we get
+
+$$
+\text{Var} \left( \log(\widehat \Lambda_a) \right) =
+\text{Var} \left( \log(\widehat B_a) \right) +
+\text{Var} \left( \log(\widehat L_a) \right) +
+\text{Var} \left( \log(\widehat S_a)  \right)
+$$
+
+Since $L_a$ is estimated using a log-link, $\text{Var} \left( \log(\widehat L_a) \right)$ is simply the sampling variance for the linear predictor in this model. The probabilities $B_a$ and $S_a$ were estimated using a logit-link, $p = \frac{1}{1+e^{-\eta}}$ where $p$ is either $B_a$ or $S_a$ and $\eta$ is the corresponding linear predictor. To compute approximations for $\text{Var} \left( \log(p)  \right)$, we used the delta-method approximation <ref!>
+
+$$
+\text{Var} \left( \log(p)  \right) \approx
+\left( \frac{\partial \log(p)}{\partial \eta} \right)^2 \text{Var} (\eta) = 
+\left( \frac{\partial -\log(1+e^{-\eta})}{\partial \eta} \right)^2 \text{Var} (\eta) 
+$$
+
+The chain rule gives
+
+$$
+\frac{\partial -\log(1+e^{-\eta})}{\partial \eta} = - \frac{1}{1+e^{-\eta}}(-e^{-\eta}) = 1-p  
+$$
+
+Hence,
+
+$$
+\text{Var} \left( \log(p)  \right) \approx
+\left( 1-p \right)^2 \text{Var} (\eta)
+$$
+
+Computation:
+
+```{r}
+# summary(b1) # Breeding probability model
+# summary(c1) # litter size model
+# summary(s1) # pup survival model
+
+# Computing linear predictors (etas)
+# NB! polynomial contrasts are orthogonal and hence depend on the distribution
+# in the data. Hence, computing predictors from original data and extracting
+# the values corresponding to each mother age.
+X_B <- model.matrix(~ poly(mother_age, 2), captive)
+X_L <- model.matrix(~ poly(mother_age, 2), captive_tr)
+X_S <- model.matrix(~ poly(mother_age, 2), survival_data)
+X_B <- X_B[match(1:9,captive$mother_age), ]
+X_L <- X_L[match(1:9,captive_tr$mother_age), ]
+X_S <- X_S[match(1:9,survival_data$mother_age), ]
+
+eta_B <- X_B %*% fixef(b1)$cond # breeding P
+eta_L <- X_L %*% fixef(c1)$cond # litter size given breeding
+eta_S <- X_S %*% fixef(s1)$cond # pup survival P
+
+# Variances of linear predictors
+V_eta_B <- X_B %*% vcov(b1)$cond %*% t(X_B) |> diag()
+V_eta_L <- X_L %*% vcov(c1)$cond %*% t(X_L) |> diag()
+V_eta_S <- X_S %*% vcov(s1)$cond %*% t(X_S) |> diag()
+
+# The three components and expected number of survivors
+(L <- exp(eta_L))         # identical to predictions from 'ggpredict'
+(B <- 1/(1+exp(-eta_B)))  # identical to predictions from 'ggpredict'
+(S <- 1/(1+exp(-eta_S)))  # identical to predictions from 'ggpredict'
+Lambda <- B*L*S
+
+# Variances of log(B), log(L), log(S), and log(Lambda)
+V_log_L <- V_eta_L
+V_log_B <- (1-B)^2 * V_eta_B # delta method approx.
+V_log_S <- (1-S)^2 * V_eta_S # delta method approx,
+V_log_Lambda <- V_log_B + V_log_L + V_log_S
+
+# Computing approx. 95% CI (central limit theorem) and making a data frame
+SE_log_Lambda <- sqrt(V_log_Lambda)
+Expected_no_survivors <- data.frame(
+  mother_age = 1:9,
+  Lambda = Lambda,
+  lwr_Lambda = exp(log(Lambda) - 2*SE_log_Lambda),
+  upr_Lambda = exp(log(Lambda) + 2*SE_log_Lambda)
+)
+
+Expected_no_survivors
+```
