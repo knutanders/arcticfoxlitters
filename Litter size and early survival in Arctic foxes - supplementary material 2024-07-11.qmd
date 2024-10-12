@@ -580,7 +580,7 @@ V_log_S <- (1-S)^2 * V_eta_S # delta method approx,
 V_log_R <- V_log_B + V_log_L + V_log_S
 
 # Computing approx. 95% CI (central limit theorem) and making a data frame
-SE_log_R <- sqrt(V_log_Lambda)
+SE_log_R <- sqrt(V_log_R)
 Expected_no_survivors <- data.frame(
   mother_age = 1:9,
   R = R,
