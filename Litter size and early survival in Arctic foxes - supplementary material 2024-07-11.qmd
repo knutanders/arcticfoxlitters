@@ -626,3 +626,28 @@ VlS/VlT
 ```
 
 Variance in the point estimates of breeding probability, litter size given breeding, and pup survival at the logarithmic scale across the mother age groups accounted for about 54%, 45% and 0.4% of the variance in reproductive success respectively. 
+
+Can we visualize the relative contribution of the different life history components to reproductive output (IS THIS THE CORRECT TERM?) for each age group like this: 
+
+```{r}
+## Create a dataframe wiht the relative contribution of each component
+## to total variance in reproductive output
+vardata <- data.frame(1:9, V_log_B/V_log_R, V_log_L/V_log_R, V_log_S/V_log_R)
+names(vardata) <- c('Age', 'Breeding', 'Litter size', 'Survival')
+vardata
+
+## Reshape the data from wide to long format
+vardata_long <- tidyr::pivot_longer(vardata, 
+  cols = c('Breeding', 'Litter size', 'Survival'), 
+  names_to = "Variable", values_to = "Value")
+head(vardata_long)
+
+
+## Create the plot
+ggplot(vardata_long, aes(x= Age, y=Value, fill=Variable)) + 
+  geom_area() +
+  theme_bw() + 
+  scale_fill_manual(values = c("azure3", "steelblue1", "grey30")) + 
+  labs(fill = "Components", y = 'Porportion of total variance') +
+  scale_x_continuous(breaks = 1:9, labels = 1:9)
+```
