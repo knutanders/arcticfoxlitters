@@ -7,7 +7,6 @@ Rendering the Quarto markdown document will produce an HTML file. In addition, t
 <br/>
 <br/>
 <br/>
-<br/>
 
 ![newborn_Arctic_fox_pups](https://github.com/user-attachments/assets/2fd996a4-cb74-438e-90ae-464504d6ebeb)
 
