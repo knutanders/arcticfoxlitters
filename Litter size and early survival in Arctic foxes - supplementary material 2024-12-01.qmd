@@ -1,0 +1,1178 @@
+---
+title: "Modelling probability of breeding, litter size and pup survival in Arctic foxes"
+author: "Kristine Ulvund, Knut Anders Hovstad, Craig R. Jackson, Lars Rød-Eriksen, Veronika Areskoug, Torbjørn Ergon, Nina E. Eide, Øystein Flagstad, Arild Landa "
+number-sections: true
+toc: true
+toc-depth: 4
+format:
+  html:
+    embed-resources: true
+editor: visual
+---
+
+# Introduction
+
+This document is part of the supplementary materials for the manuscript "**Reproductive senescence and effects of maternal age on reproductive performance in the Arctic fox**", and describes the analysis of variation in Arctic fox breeding probability, litter size and early pup survival.
+
+The main objective was to examine the relationship between mother's age and probability of breeding, litter size and early pup survival (from den emergence to 8-10 weeks of age) in captive foxes and mother's age and litter size in wild foxes. The data on captive foxes are from a conservation breeding programme. Data on litter size in wild populations were collected from den sites in five different\
+populations.
+
+The most important prey for Arctic foxes in the wild is lemmings and other species of small rodents. The cyclic variation in abundance of small rodents create large variations in availability of prey between years. In contrast, foxes in the captive breeding station were fed every day and thus experienced no variation in food resources between years.
+
+{{< pagebreak >}}
+
+To run the R code in this document, it is necessary to first download these three datasets:
+
+(1) litter_size_captive_breeding_station.csv
+
+(2) litter_size_wild_populations.csv
+
+(3) survival_captive_breeding_station.csv
+
+\
+All analyses were conducted using R version 4.2.2 and the models were fitted using glmmTMB version 1.1.10 (Brooks et al. 2017). The assumptions for all models were checked using the DHARMa package version 0.4.7 (Hartig 2024, see code in Quarto source file for details). Further information about the study and the data can be found in the main manuscript.
+
+\
+Loading the required packages:
+
+```{r}
+#| output: false
+  library(tidyverse)   # data management and plotting (ggplot2)
+  library(glmmTMB)     # glmmTMB function used to fit the models
+  library(splines)     # bs function for B-splines  
+  library(DHARMa)      # functions to check model assumptions
+  library(ggeffects)   # ggemmeans function used to estimate marginal means
+  library(ggbeeswarm)  # geom_quasirandom for beeswarmplot
+  library(MuMIn)       # AICc function
+  library(knitr)       # functions to create tables
+  library(gt)          # functions to create tables 
+```
+
+\
+Reading in the three data sets:
+
+```{r}
+#| warning: false
+captive <- read_csv('data/litter_size_captive_breeding_station.csv')
+wild <- read_csv('data/litter_size_wild_populations.csv')
+survival_data <- read_csv("data/survival_captive_breeding_station.csv")
+```
+
+# Probability of breeding in captivity
+
+## Data description and models
+
+The data from foxes in captivity included both females breeding and not breeding. These data are not available for wild foxes. For captive foxes we could therefore model the probability of producing a litter. The binary outcome 'breeding' or 'no breeding' of individual foxes in each year was used as the response variable and analysed using a GLMM with a binomial distribution. The models included the fixed effect 'mother age' using either a quadratic or cubic function. The 'mother ID' and 'year' were included as random effects to account for correlation in the data.
+
+\
+The structural form of the full model for probability of breeding with a quadratic function for 'mother age':
+
+$$
+\begin{aligned}
+Y_{ij} &\sim \text{Bernoulli}(b_{ij}) \\
+\text{logit}(b_{ij}) &= \beta_0 + X_{ij}\beta_1 + X_{ij}^2\beta_2 + \delta_i + \gamma_j \\
+\delta_i &\sim N(0, \sigma_\delta) \\
+\epsilon_j &\sim N(0, \sigma_\epsilon)
+\end{aligned}
+$$ where $b_{ij}$ is the probability of breeding for mother $i$ in year $j$.
+
+$\delta_i$ is the random effect of mother $i$ and $\gamma_j$ the random effect of year $j$.
+
+\
+
+To examine the potential effect of rodents on probability of breeding in captivity, we also fitted a second model including rodent index as a predictor:
+
+$$
+\begin{aligned}
+Y_{ij} & \sim \text{Bernoulli}(b_{ij}) \\
+\text{logit}(b_{ij}) & = \beta_0 + X_{ij}\beta_1 +X_{ij}^2\beta_2 + s(R_{j})
++ \delta_i + \gamma_j \\
+\delta_i & \sim N(0, \sigma_\delta) \\
+\epsilon_j & \sim N(0, \sigma_\epsilon) \\
+\end{aligned}
+$$
+
+$s()$ is a B-spline function that allows for a smooth, non-linear relationship between $\text{logit}(b_{ij})$ and the rodent index $R$ in year $j$.\
+
+## Analysis and results
+
+Initially, we created the variable breeding:
+
+```{r}
+captive <- mutate(captive, breeding = ifelse(litter_size == 0, 0, 1))
+```
+
+\
+Fit a model with only intercept and random effects:
+
+```{r}
+b0 <- glmmTMB(breeding ~ 1 + (1|mother_id) + (1|year),
+              data = captive, family = binomial)
+```
+
+\
+Fit quadratic model for probability of breeding:
+
+```{r}
+b1 <- glmmTMB(breeding ~ poly(mother_age, 2) + 
+                (1|mother_id) + (1|year),
+              data = captive, family = binomial)
+```
+
+\
+Fit an alternative quadratic model including the variable rodent_index as a predictor:
+
+```{r}
+b2 <- glmmTMB(breeding ~ poly(mother_age, 2) + bs(rodent_index, 3) + 
+                (1|mother_id) + (1|year),
+              data = captive, family = binomial)
+```
+
+\
+Fit cubic model for probability of breeding:
+
+```{r}
+b3 <- glmmTMB(breeding ~ poly(mother_age, 3) + 
+                (1|mother_id) + (1|year),
+              data = captive, family = binomial)
+```
+
+\
+Fit an alternative cubic model including the variable rodent_index as a predictor:
+
+```{r}
+b4 <- glmmTMB(breeding ~ poly(mother_age, 3) + bs(rodent_index, 3) + 
+                (1|mother_id) + (1|year),
+              data = captive, family = binomial)
+```
+
+\
+Table S1 shows that models which include mothers age using a quadratic function has lower AICc values than models with a cubic function. Adding 'rodent index' as a predictor to the models resulted in only a small change in AICc values. Considering the small difference in AIC between model b1 and b2, and no clear pattern of covariation between breeding and rodent abundance in the data, we decided to use the most parsimonious model b1.
+
+```{r}
+#| echo: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S1** Model comparison for probability of breeding. The table presents the fixed effects and corrected Akaike Information Criterion (AICc) values for each model.</span>"
+#| tbl-cap-location: top
+data.frame(
+  model = c("b0", "b1", "b2", "b3", "b4"),
+  fixed_effects = c("intercept only",
+                    "poly(mother_age, 2)", 
+                    "poly(mother_age, 2) + bs(rodent index, 3)", 
+                    "poly(mother_age, 3)", 
+                    "poly(mother_age, 3) + bs(rodent index, 3)"),
+  AICc = sprintf("%.2f", c(AICc(b0), AICc(b1), AICc(b2), AICc(b3), AICc(b4)))
+) |> gt() |>
+  cols_label(
+    model = "Model",
+    fixed_effects = "Fixed effects",
+    AICc = "AICc"
+  ) |>
+  tab_options(
+    table.width = pct(75),
+    heading.align = "left",
+    column_labels.font.weight = "bold"
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 5)
+  )
+```
+
+\
+Estimated marginal means for probability of breeding are calculated using the ggemmeans function from the R package ggeffects (Lüdecke 2024). The R code used to generate Table S2 and Figure S1 is available in the Quarto source file included within the Supplementary Materials.
+
+```{r}
+## Estimated marginal means for probability of breeding based on model b1
+pb <- ggemmeans(b1, terms="mother_age [all]", type = 'fixed')
+
+```
+\
+```{r}
+#| echo: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S2** Estimated marginal means for probability of breeding with 95% confidence intervals.</span>"
+#| tbl-pos: "H"
+# Table S2: Estimated marginal means for probability of breeding
+pb |> tibble() |> 
+  mutate('Age of mother' = as.integer(x)) |>
+  mutate('Estimated mean' = sprintf("%.2f", round(predicted, 2))) |> 
+  mutate('95% CI'  = paste(sprintf("%.2f", round(conf.low, 2)),
+                           sprintf("%.2f", round(conf.high, 2)),
+                           sep = ", ")) |>
+  select(last_col(offset = 2):last_col()) |> 
+  gt() |> 
+  cols_width(
+   c(`Age of mother`) ~ pct(25),
+   c(`Estimated mean`) ~ pct(40),
+   c(`95% CI`) ~ pct(35)
+  ) |>
+  tab_options(
+    table.width = pct(65),
+    heading.align = "center",
+    column_labels.font.weight = "bold"
+  ) |>
+  tab_style(
+    style = cell_text(align = "right"),
+    locations = cells_column_labels(c(`Age of mother`))
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 10)
+  )
+```
+
+\
+\
+
+```{r}
+#| echo: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+# Figure S1: Plot of estimated marginal means for probability of breeding
+pb |> tibble() |>
+  ggplot(aes(x=x, y= predicted)) + 
+  geom_errorbar(data=tibble(pb), 
+                mapping=aes(x=as.factor(x), ymin=conf.low, ymax=conf.high), 
+                width=0.2, linewidth=0.58, color="grey30") + 
+  geom_point(color = 'firebrick3', size = 2.15) + 
+  scale_y_continuous(limits = c(0, 1), 
+                     expand = c(0, 0),) + 
+  labs(y="Probability of breeding", x = "Age of mother (years)") +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"), 
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10))
+```
+
+**Figure S1** Probability of breeding in captive Arctic foxes plotted against age of mother. Whiskers indicate 95% confidence intervals.
+
+# Litter size
+
+## Data description and models
+
+For the *wild populations*, data on litter size were only recorded for breeding events that actually produced pups and where the pups were observed after emerging from the den. The data does not include information about unsuccessful breeding events or foxes that did not breed at all.
+
+For *captive foxes,* litter size data include zeros. For comparison with *wild foxes*, we have removed the zeros for captive foxes and fitted a zero-truncated model also for these data. This implies that we model the variation in litter size conditional on producing at least one pup that survived until marking.
+
+In both datasets, there are repeated observations for some of the females (litter size for the same female in different years). To account for this dependence, we included the random effect 'mother ID'. In the datasets, each mother had a single litter per year.
+
+For wild populations the effect of year can be expected to vary among mountain areas, but the data does not permit the estimation of a random effect of year within mountain area. The model for litter size in wild populations therefore included 'area' in addition to 'mother ID' as random effects. The model for litter size in captivity included 'year' and 'mother ID' as random effects.
+
+\
+The structural form of the model for litter size in wild populations:
+
+$$
+\begin{aligned}
+Y_{i,k} &\sim \text{ztCMP}(\lambda_{i,k}, \phi) \\
+\log(\lambda_{i,k}) &= \beta_0 +X_{i}\beta_1 + X_{i}^2\beta_2 + s(R_{k}) + 
+\delta_i + \epsilon_k \\
+\delta_i &\sim N(0, \sigma_\delta) \\
+\epsilon_k &\sim N(0, \sigma_\epsilon)
+\end{aligned}
+$$
+
+\
+where $Y_{i,k}$ and $\lambda_{i,k}$ are observed litter size and expected litter size of mother $i$ in area $k$. $\text{ztCMP}$ is the zero-truncated Conway-Maxwell Poisson distribution with dispersion scale $\phi$, as parameterized in the `glmmTMB` package (Brooks et al. 2017). $X_{i}$ is the age of mother $i$ included as a second order polynomial with intercept $\beta_0$ the regression coefficients $\beta_1$ and $\beta_2$. $R_{k}$ is rodent index from area $k$ and $s()$ is a B-spline function that allows for a smooth, non-linear relationship between the response litter size and rodent index. The B-spline is implemented using the `bs` function from the `splines` package. $\delta_i$ is the random effect of mother $i$ and $\epsilon_k$ is the random effect of mountain area $k$ (both random effects assumed to be normal with zero mean).
+
+Litter size in captivity was analysed using models that included the fixed effect 'mother age' as either a quadratic or cubic function, and 'mother ID' and 'year' as random effects. Initially, we also included 'rodent index' as a fixed effect but the data did not provide any support for a relationship between litter size and 'rodent index'. The 'rodent index' was therefore omitted from the final model for litter size in captivity.
+
+## Analysis and results
+
+### Litter size in captivity
+
+To ensure comparability between the litter size data from captive and wild populations, we excluded breeding attempts that did not result in pups before analysis. We then applied zero-truncated models to both datasets.\
+
+```{r}
+## Removing zeros for truncated models
+captive_tr <- captive[captive$litter_size != 0,]
+```
+
+\
+Fit model with only intercept and random effects:
+
+```{r}
+c0 <- glmmTMB(litter_size ~ 1 + (1|mother_id) + (1|year),
+              data = captive_tr, family=truncated_compois)
+```
+
+\
+Fit model with quadratic function for 'mother age':
+
+```{r}
+c1 <- glmmTMB(litter_size ~ poly(mother_age, 2) + 
+                    (1|mother_id) + (1|year),
+                  data = captive_tr, family=truncated_compois)
+```
+
+\
+Fit model with quadratic function for 'mother age' and 'B-spline' function for 'rodent index':
+
+```{r}
+c2 <- glmmTMB(litter_size ~ poly(mother_age, 2) + 
+                bs(rodent_index, 3) +
+                (1|mother_id) + (1|year),
+              data = captive_tr, family=truncated_compois)
+```
+
+\
+Fit model with cubic function for 'mother age':
+
+```{r}
+c3 <- glmmTMB(litter_size ~ poly(mother_age, 3) + 
+                (1|mother_id) + (1|year),
+              data = captive_tr, family=truncated_compois)
+```
+
+\
+In addition, we tried to fit a model with only 'rodent index' as fixed effect but we could not get this model to converge.
+
+The model with a quadratic function for 'mother age' had the lowest AICc value (Table S3). The difference in AICc to the model with only intercept was `r sprintf("%.2f", AICc(c0) - AICc(c1))` and thus 'mother age' significantly improved the model. The models with 'rodent index' as predictor did not improve the AICc value.\
+
+```{r}
+#| echo: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S3** Model comparison for litter size in captive foxes. The table presents the fixed effects and corrected Akaike Information Criterion (AICc) values for each model.</span>"
+#| tbl-cap-location: top
+# Table S3: Model comparison for litter size in captive foxes
+data.frame(
+  model = c("c0", "c1", "c2", "c3"),
+  fixed_effects = c("intercept only",
+                    "poly(mother_age, 2)", 
+                    "poly(mother_age, 2) + bs(rodent index, 3)", 
+                    "poly(mother_age, 3)"),
+  AICc = sprintf("%.2f", c(AICc(c0), AICc(c1), AICc(c2), AICc(c3))) 
+) |> gt() |>
+  cols_label(
+    model = "Model",
+    fixed_effects = "Fixed effects",
+    AICc = "AICc"
+  ) |>
+  tab_options(
+    table.width = pct(75),
+    heading.align = "left",
+    column_labels.font.weight = "bold"
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 4)
+  )
+```
+
+\
+
+Estimated marginal means for litter size in captivity were calculated based on model c1, and the results displayed in Table S4 and Figure S2.\
+
+\
+
+```{r}
+pc <- ggemmeans(c1, terms = "mother_age [all]", type = "fixed")
+```
+
+```{r}
+#| echo: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S4** Estimated marginal means for litter size in captivity with 95% confidence intervals.</span>"
+#| tbl-pos: "H"
+# Table S4: Estimated marginal means for litter size in captivity
+pc |> tibble() |> 
+  mutate('Age of mother' = as.integer(x)) |>
+  mutate('Estimated mean' = sprintf("%.2f", round(predicted, 2))) |> 
+  mutate('95% CI'  = paste(sprintf("%.2f", round(conf.low, 2)),
+                           sprintf("%.2f", round(conf.high, 2)),
+                           sep = ", ")) |>
+  select(last_col(offset = 2):last_col()) |> 
+  gt() |> 
+  cols_width(
+    c(`Age of mother`) ~ pct(25),
+    c(`Estimated mean`) ~ pct(40),
+    c(`95% CI`) ~ pct(35)
+  ) |>
+  tab_options(
+    table.width = pct(65),
+    heading.align = "center",
+    column_labels.font.weight = "bold"
+  ) |>
+  tab_style(
+    style = cell_text(align = "right"),
+    locations = cells_column_labels(c(`Age of mother`))
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 9)
+  )
+```
+
+\
+
+```{r}
+#| echo: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+# Figure S2. Litter size as a function of female age in captive Arctic foxe
+pc |> tibble() |> ggplot(aes(x = x, y = predicted)) +
+  geom_errorbar(width = 0.2, 
+                aes(ymin = conf.low, ymax = conf.high)) +
+  geom_point(color = 'indianred3', size = 2.15) + 
+  scale_y_continuous(limits = c(0, 14.2),
+                     expand = c(0, 0),
+                     breaks = c(0, 2, 4, 6, 8, 10, 12, 14)) +
+  scale_x_continuous(limits = c(0.9, 9.1), 
+                     breaks = 1:9) +
+  labs(y="Litter size", x = "Age of mother (years)") +
+  geom_quasirandom(data = captive_tr, 
+                   mapping=aes(x=mother_age, y= litter_size),
+                   alpha = 0.4, size = 0.85, width = 0.1) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(), 
+        plot.margin = margin(t = 2, r = 5.5, b = 0, l = 5.5, unit = "pt"),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10))
+```
+
+**Figure S2** Litter size as a function of female age in captive Arctic foxes. Estimated marginal means are displayed as red dots with whiskers indicating 95% confidence intervals. Observations are displayed as smaller, grey dots.
+
+\
+
+### Litter size in wild populations
+
+\
+Fit model with only intercept and random effects:
+
+```{r}
+w0 <- glmmTMB(litter_size ~ 1 + (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+Fit model with quadratic function for 'mother age':
+
+```{r}
+w1 <- glmmTMB(litter_size ~ poly(mother_age, 2) + 
+                (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+Fit model with B-spline function for 'rodent index':
+
+```{r}
+w2 <- glmmTMB(litter_size ~ bs(rodent_index, 3) + 
+                (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+Fit a model with quadratic function for 'mother age' and B-spline function for 'rodent index':
+
+```{r}
+w3 <- glmmTMB(litter_size ~ poly(mother_age, 2) + bs(rodent_index, 3) +
+                (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+Fit model with cubic function for 'mother age':
+
+```{r}
+w4 <- glmmTMB(litter_size ~ poly(mother_age, 3) + 
+                (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+Fit model with a cubic function for 'mothers age' and a B-spline function for 'rodent index'
+
+```{r}
+w5 <- glmmTMB(litter_size ~ poly(mother_age, 3) + bs(rodent_index, 3) + 
+                (1|mother_id) + (1|mountain_area),
+              data = wild, family=truncated_compois)
+```
+
+\
+
+The best model, as indicated by AICc, included only 'rodent index' as a fixed effect in addition to the intercept (Table S5). Using a cubic function for 'mother age' did not improve the model. The model including both a quadratic function for 'mother age' and a B-spline function for 'rodent index' had a somewhat higher AICc value compared to the model with only 'rodent index'. Consequently, we cannot conclude that litter size in wild foxes depends on maternal age. Given that the primary objective of this study was to investigate the effects of maternal age on Arctic fox reproductive output, we opted to present the full model that includes a quadratic function for 'mother age'.
+
+\
+
+```{r}
+#| echo: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S5** Model comparison for litter size in wild populations. The table presents the fixed effects and corrected Akaike Information Criterion (AICc) values for each model.</span>"
+#| tbl-cap-location: top
+
+data.frame(
+  model = c("w0", "w1", "w2", "w3", "w4", "w5"),
+  fixed_effects = c("intercept only",
+                    "poly(mother_age, 2)",
+                    "bs(rodent index, 3)",
+                    "poly(mother_age, 2) + bs(rodent index, 3)", 
+                    "poly(mother_age, 3)", 
+                    "poly(mother_age, 3) + bs(rodent index, 3)"),
+  AICc = sprintf("%.2f", c(AICc(w0), AICc(w1), AICc(w2), AICc(w3), AICc(w4), AICc(w5)))
+  ) |> gt() |>
+  cols_label(
+    model = "Model",
+    fixed_effects = "Fixed effects",
+    AICc = "AICc"
+  ) |>
+  tab_options(
+    table.width = pct(75),
+    heading.align = "left",
+    column_labels.font.weight = "bold"
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 6)
+  )
+```
+
+```{r}
+#| eval: false
+#| echo: false
+##  DHARMa library used to examine model assumptions 
+testDispersion(w3)
+simulateResiduals(fittedModel = w3, plot = F) |> plot()
+```
+
+\
+
+Estimated marginal means for litter size in wild populations were calculated based on model w3, and results are provided in Table S6 and also illustrated in Figure S3.
+
+\
+
+```{r}
+pw <- ggemmeans(w3, terms = "mother_age [all]",
+                type = "fixed", condition = c(rodent_index = 4))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S6** Estimated marginal means for litter size in wild populations with 95% confidence intervals.</span>"
+#| tbl-pos: "H"
+# Table S6: Estimated marginal means for probability of breeding
+pw |> tibble() |> 
+  mutate('Age of mother' = as.integer(x)) |>
+  mutate('Estimated mean' = sprintf("%.2f", round(predicted, 2))) |> 
+  mutate('95% CI'  = paste(sprintf("%.2f", round(conf.low, 2)),
+                           sprintf("%.2f", round(conf.high, 2)),
+                           sep = ", ")) |>
+  select(last_col(offset = 2):last_col()) |> 
+  gt() |> 
+  cols_width(
+    vars(`Age of mother`) ~ pct(25),
+    vars(`Estimated mean`) ~ pct(40),
+    vars(`95% CI`) ~ pct(35)
+  ) |>
+  tab_options(
+    table.width = pct(65),
+    heading.align = "center",
+    column_labels.font.weight = "bold"
+  ) |>
+  tab_style(
+    style = cell_text(align = "right"),
+    locations = cells_column_labels(vars(`Age of mother`))
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 8)
+  )
+```
+
+\
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+# Figure S3. Estimated and observed litter size as a function of female age in wild Arctic foxes.
+pw |> ggplot(aes(x = x, y = predicted)) +
+  geom_errorbar(width = 0.2, 
+                aes(ymin = conf.low, ymax = conf.high)) +
+  geom_point(color = 'deepskyblue4', size = 2.15) + 
+  scale_y_continuous(limits = c(0, 14.2),
+                     expand = c(0, 0),
+                     breaks = c(0, 2, 4, 6, 8, 10, 12, 14)) +
+  scale_x_continuous(limits = c(0.9, 8.1), 
+                     breaks = 1:8) +
+  labs(y="Litter size", x = "Age of mother (years)") +
+  geom_quasirandom(data = wild, 
+                   mapping=aes(x=mother_age, y= litter_size),
+                   alpha = 0.4, size = 0.85, width = 0.1) +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10))
+```
+
+\
+**Figure S3** Litter size as a function of female age in wild Arctic foxes. Estimated marginal means are displayed as blue dots and observations as smaller, grey dots. Whiskers indicate 95% confidence intervals.
+
+```{r}
+#| eval: false
+#| echo: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+## Plot of litter size for both captive and wild populations 
+## used in the manuscript (without observations)
+pc$origin <- "captive"
+pw$origin <- "wild"
+(estimates <- rbind(pc, pw) |> tibble())
+
+estimates |> ggplot(aes(x = x, y = predicted, group = origin, color = origin, shape = origin)) +
+  geom_errorbar(width = 0.2, 
+                aes(ymin = conf.low, ymax = conf.high), position=position_dodge(width=0.5), colour = "black", size = 0.5) +
+  geom_point(position = position_dodge(width = 0.5)) +
+  aes(size = origin) +
+  scale_shape_manual(values=c(16, 18)) +
+  scale_size_manual(values=c(3, 3.5)) +  
+  scale_color_manual(values=c('indianred3','deepskyblue4')) +
+  scale_y_continuous(limits = c(0, 8.5),
+                     expand = c(0, 0),
+                     breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_x_continuous(limits = c(0.8, 9.1), 
+                     breaks = 1:9) +
+  labs(y="Litter size", x = "Age of mother (years)") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank()) +
+  theme(legend.position = "none")
+```
+
+\
+
+Estimated litter size in wild populations in response to rodent index is given in Figure S4.
+
+```{r}
+#| warning: false
+pr <- ggemmeans(w3, terms = c("rodent_index [0:26.5, by=1]"), 
+          type = "fixed", condition = c(mother_age = 4))
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+## Figure S4: Estimated litter size in wild populations in response to rodent index
+pr |> 
+  plot(colors = "#56B4E9") + 
+  theme_bw() + 
+  theme(plot.title = element_blank(),
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank(),
+        axis.text.x=element_text(size=9),
+        axis.text.y=element_text(size=9),
+        axis.title.x = element_text(color = "black", size = 10),
+        axis.title.y = element_text(color = "black", size = 10)) + 
+  labs(x = "Rodent index", y = "Litter size")
+```
+
+**Figure S4** Relationship between rodent index and estimated litter size in wild Arctic foxes. The effect of rodent index on litter size is described by a B-spline function.\
+
+# Survival of pups in captivity
+
+## Data description and model
+
+The dataset includes information on survival of individual Arctic fox pups in the captive breading station measured between emergence from the den until eight to ten weeks of age. <br/> Survival was analyzed using a generalized linear mixed model (GLMM) with a binomial distribution and logit link function. The age of the breeding female was included using a quadratic function to allow for a non-linear relationship between pup survival and mother age. The model also included random effects for year and 'mother ID' to account for correlation in the data. Due to the dataset's limited size and the high probability of survival, insufficient information was available to accurately estimate a random effect of 'litter ID'. Additionally, the presence of litters with only one or two pups further complicated the estimation of a random effect associated with litter ID.
+
+The structural form of the binomial model for pup survival:
+
+$$
+\begin{aligned}
+Y_{ij} & \sim \text{Bernoulli}(b_{ij}) \\
+\text{logit}(b_{ij}) & = \beta_0 + X_{ij}\beta_1 +X_{ij}^2\beta_2 + s(R_{j})
++ \delta_i + \gamma_j \\
+\delta_i & \sim N(0, \sigma_\delta) \\
+\epsilon_j & \sim N(0, \sigma_\epsilon) \\
+\end{aligned}
+$$
+
+$s()$ is a B-spline function that allows for a smooth, non-linear relationship between $\text{logit}(b_{ij})$ and the rodent index $R$ in year $j$.
+
+## Analysis and results
+
+Fit model with only intercept and random effects:
+
+```{r}
+s0 <- glmmTMB(survival ~ 1 + (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+Fit quadratic model for pup survival:
+
+```{r}
+s1 <- glmmTMB(survival ~ poly(mother_age, 2) + 
+                (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+Fit model for pup survival with 'rodent index' as predictor:
+
+```{r}
+s2 <- glmmTMB(survival ~ bs(rodent_index, 3) +
+                (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+Fit model including 'mother age' and 'rodent index':
+
+```{r}
+s3 <- glmmTMB(survival ~ poly(mother_age, 2) + bs(rodent_index, 3) +
+              (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+Fit model with cubic function for 'mother age':
+
+```{r}
+s4 <- glmmTMB(survival ~ poly(mother_age, 3) + 
+                (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+Fit model with cubic function for 'mother age' and B-spline for 'rodent index':
+
+```{r}
+s5 <- glmmTMB(survival ~ poly(mother_age, 3) + bs(rodent_index, 3) +
+              (1|mother_id) + (1|year),
+              data = survival_data, family = binomial)
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S7** Model comparison for probability of early pup survival in captivity. The table presents the fixed effects and corrected Akaike Information Criterion (AICc) values for each model.</span>"
+#| tbl-cap-location: top
+
+data.frame(
+  model = c("s0", "s1", "s2", "s3", "s4", "s5"),
+  fixed_effects = c("intercept only",
+                    "poly(mother_age, 2)",
+                    "bs(rodent index, 3)",
+                    "poly(mother_age, 2) + bs(rodent index, 3)", 
+                    "poly(mother_age, 3)", 
+                    "poly(mother_age, 3) + bs(rodent index, 3)"),
+  AICc = sprintf("%.2f", c(AICc(s0), AICc(s1), AICc(s2), AICc(s3), AICc(s4), AICc(s5)))
+  ) |> gt() |>
+  cols_label(
+    model = "Model",
+    fixed_effects = "Fixed effects",
+    AICc = "AICc"
+  ) |>
+  tab_options(
+    table.width = pct(75),
+    heading.align = "left",
+    column_labels.font.weight = "bold"
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 6)
+  )
+```
+
+\
+
+The best model with respect to AICc was model s4 including a cubic function for 'mother age' as the only fixed effect in addition to the intercept (Table S7).
+
+```{r}
+#| eval: false
+#| echo: false
+##  DHARMa library used to examine model assumptions 
+testDispersion(s4)
+simulateResiduals(fittedModel = s4, plot = F) |> plot()
+```
+
+Survival of pups in captivity is estimated using the ggemmeans function from the ggeffects package and the results displayed in Table S8 and Figure S5.
+
+```{r}
+## Estimated marginal means based on model s4
+ps <- ggemmeans(s4, terms = "mother_age [all]", type = "fixed")
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| tbl-cap: "<span style='color: black; text-align: left; display: block;'>**Table S8** Estimated marginal means for early pup survival in captivity with 95% confidence intervals.</span>"
+#| tbl-pos: "H"
+# Table S8: Estimated marginal means for early pup survival
+ps |> tibble() |> 
+  mutate('Age of mother' = as.integer(x)) |>
+  mutate('Estimated mean' = sprintf("%.2f", round(predicted, 2))) |> 
+  mutate('95% CI'  = paste(sprintf("%.2f", round(conf.low, 2)),
+                           sprintf("%.2f", round(conf.high, 2)),
+                           sep = ", ")) |>
+  select(last_col(offset = 2):last_col()) |> 
+  gt() |> 
+  cols_width(
+    vars(`Age of mother`) ~ pct(25),
+    vars(`Estimated mean`) ~ pct(40),
+    vars(`95% CI`) ~ pct(35)
+  ) |>
+  tab_options(
+    table.width = pct(65),
+    heading.align = "center",
+    column_labels.font.weight = "bold"
+  ) |>
+  tab_style(
+    style = cell_text(align = "right"),
+    locations = cells_column_labels(vars(`Age of mother`))
+  ) |>
+  opt_align_table_header(align = "left") |>
+  tab_style(
+    style = cell_borders(
+      sides = "top",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_column_labels(everything())
+  ) |>
+  tab_style(
+    style = cell_borders(
+      sides = "bottom",
+      color = "black",
+      weight = px(2)
+    ),
+    locations = cells_body(rows = 9)
+  )
+```
+
+\
+\
+
+```{r}
+#| echo: false
+#| fig-width: 6.15
+#| fig-height: 3.75
+#| fig-align: center
+ps |> tibble() |>
+  ggplot(aes(x=x, y= predicted)) + 
+  geom_errorbar(data=tibble(ps), 
+                mapping=aes(x=as.factor(x), ymin=conf.low, ymax=conf.high), 
+                width=0.2, linewidth=0.58, color="grey30") + 
+  geom_point(color = 'indianred3', size = 3) + 
+  scale_y_continuous(limits = c(0, 1), 
+                     expand = c(0, 0),) + 
+  labs(y="Probability of survival", x = "Age of mother (years)") +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"), 
+        panel.grid.major.x = element_blank(), 
+        panel.grid.minor.x = element_blank(), 
+        panel.grid.major.y = element_blank(), 
+        panel.grid.minor.y = element_blank())
+```
+
+**Figure S5** Probability of survival in captive Arctic fox pups from birth until 8-10 weeks of age plotted against age of mother.
+
+# Life-history components
+
+In this section, we estimate mean expected surviving pups and corresponding 95% confidence intervals based on estimated probability of breeding, litter size and pup survival. Variation in the estimated means between age groups, was used to calculate the contribution of variance in each life-history component to variance in overall reproductive output.
+
+## Analysis and results
+
+The expected number of surviving offspring in captivity ($\widehat R_a$), depending on mother age ($a$), can be computed by multiplying the predicted breeding probability ($\widehat B_a$), litter size ($\widehat L_a$), and offspring survival ($S_a$) for each mother age.
+
+$$
+\widehat R_a = \widehat B_a \widehat L_a \widehat S_a
+$$
+
+\
+To compute an approximate 95% confidence interval, we first computed the approximate sampling variance and confidence interval on the log-scale, and then back transform the confidence interval to the arithmetic scale.
+
+\
+Since $\log(\widehat R_a) = \log(\widehat B_a) + \log(\widehat L_a) + \log(\widehat S_a)$ and the three components were estimated independently, we got
+
+$$
+\text{Var} \left( \log(\widehat R_a) \right) =
+\text{Var} \left( \log(\widehat B_a) \right) +
+\text{Var} \left( \log(\widehat L_a) \right) +
+\text{Var} \left( \log(\widehat S_a)  \right)
+$$
+
+\
+Since $L_a$ was estimated using a log-link, $\text{Var} \left( \log(\widehat L_a) \right)$ is simply the sampling variance for the linear predictor in this model. The probabilities $B_a$ and $S_a$ were estimated using a logit-link, $p = \frac{1}{1+e^{-\eta}}$ where $p$ is either $B_a$ or $S_a$ and $\eta$ is the corresponding linear predictor. To compute approximations for $\text{Var} \left( \log(p) \right)$, we used the delta-method approximation (Pawitan 2001).
+
+\
+$$
+\text{Var} \left( \log(p)  \right) \approx
+\left( \frac{\partial \log(p)}{\partial \eta} \right)^2 \text{Var} (\eta) = 
+\left( \frac{\partial -\log(1+e^{-\eta})}{\partial \eta} \right)^2 \text{Var} (\eta) 
+$$
+
+\
+The chain rule gives
+
+$$
+\frac{\partial -\log(1+e^{-\eta})}{\partial \eta} = - \frac{1}{1+e^{-\eta}}(-e^{-\eta}) = 1-p  
+$$
+
+\
+Hence,
+
+$$
+\text{Var} \left( \log(p)  \right) \approx
+\left( 1-p \right)^2 \text{Var} (\eta)
+$$
+
+\
+
+Compute expected numbers of surviving pups (with 95% confidence intervals) for each age group :
+
+```{r}
+# summary(b1) # Breeding probability model
+# summary(c1) # litter size model
+# summary(s1) # pup survival model
+
+# Computing linear predictors (etas)
+# NB! polynomial contrasts are orthogonal and hence depend on the distribution
+# in the data. Hence, computing predictors from original data and extracting
+# the values corresponding to each mother age.
+X_B <- model.matrix(~ poly(mother_age, 2), captive)
+X_L <- model.matrix(~ poly(mother_age, 2), captive_tr)
+X_S <- model.matrix(~ poly(mother_age, 2), survival_data)
+X_B <- X_B[match(1:9,captive$mother_age), ]
+X_L <- X_L[match(1:9,captive_tr$mother_age), ]
+X_S <- X_S[match(1:9,survival_data$mother_age), ]
+
+eta_B <- X_B %*% fixef(b1)$cond # breeding P
+eta_L <- X_L %*% fixef(c1)$cond # litter size given breeding
+eta_S <- X_S %*% fixef(s1)$cond # pup survival P
+
+# Variances of linear predictors
+V_eta_B <- X_B %*% vcov(b1)$cond %*% t(X_B) |> diag()
+V_eta_L <- X_L %*% vcov(c1)$cond %*% t(X_L) |> diag()
+V_eta_S <- X_S %*% vcov(s1)$cond %*% t(X_S) |> diag()
+
+# The three components and expected number of survivors
+(L <- exp(eta_L))         
+(B <- 1/(1+exp(-eta_B)))  
+```
+
+\
+
+```{r}
+(S <- 1/(1+exp(-eta_S)))  
+```
+
+```{r}
+R <- B*L*S
+
+# Variances of log(B), log(L), log(S), and log(Lambda)
+V_log_L <- V_eta_L
+V_log_B <- (1-B)^2 * V_eta_B # delta method approx.
+V_log_S <- (1-S)^2 * V_eta_S # delta method approx,
+V_log_R <- V_log_B + V_log_L + V_log_S
+
+# Computing approx. 95% CI (central limit theorem) and making a data frame
+SE_log_R <- sqrt(V_log_R)
+expected_survivors <- data.frame(
+  mother_age = 1:9,
+  R = R,
+  lwr_R = exp(log(R) - 2*SE_log_R),
+  upr_R = exp(log(R) + 2*SE_log_R)
+)
+
+expected_survivors
+```
+
+\
+
+The variance components are calculated like this:
+
+```{r}
+VlB <- var(log(B))
+VlL <- var(log(L))
+VlS <- var(log(S))
+
+VlT <- VlB + VlL + VlS
+
+VlB/VlT
+VlL/VlT
+VlS/VlT
+```
+
+\
+Variance in the point estimates of breeding probability, litter size given breeding, and pup survival at the logarithmic scale across the mother age groups accounted for about 54.1%, 45.5% and 0.4% of the variance in reproductive success respectively.
+
+\
+
+# References
+
+Brooks, M. E., Kristensen, K., Van Benthem, K. J., Magnusson, A., Berg, C. W., Nielsen, A., ... & Bolker, B. M. (2017). glmmTMB balances speed and flexibility among packages for zero-inflated generalized linear mixed modeling. The R journal, 9(2), 378-400 <https://doi.org/10.32614/RJ-2017-066>
+
+Hartig, F. (2024). DHARMa: Residual Diagnostics for Hierarchical (Multi-Level / Mixed) Regression Models. R package version 0.4.7, <https://CRAN.R-project.org/package=DHARMa>.
+
+Lüdecke, D. (2024). ggeffects: Marginal Means And Adjusted Predictions Of Regression Models. Retrieved October 20, 2024, from <https://strengejacke.github.io/ggeffects/articles/ggeffects.html>
+
+Pawitan Y. (2001). In all likelihood: statistical modelling and inference using likelihood. Oxford: Oxford University Press.
